@@ -1,35 +1,116 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from 'react';
+import { useEffect } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import AuthPage from './components/AuthPage';
+import Layout from './components/Layout';
+import GuestLayout from './components/GuestLayout';
+import ProfileSetup from './components/attorney/ProfileSetup';
+import ServicesManager from './components/attorney/ServicesManager';
+import AvailabilityManager from './components/attorney/AvailabilityManager';
+import AppointmentsDashboard from './components/attorney/AppointmentsDashboard';
+import AttorneySearch from './components/client/AttorneySearch';
+import BookingPage from './components/client/BookingPage';
+import ClientDashboard from './components/client/ClientDashboard';
+import { Loader2 } from 'lucide-react';
 
-function App() {
-  const [count, setCount] = useState(0)
+function AppContent() {
+  const { user, userProfile, loading, isGuest } = useAuth();
+  const [currentView, setCurrentView] = useState('default');
+  const [selectedAttorneyId, setSelectedAttorneyId] = useState<string | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-600" />
+      </div>
+    );
+  }
+
+  if (!user && !userProfile && !isGuest) {
+    return <AuthPage />;
+  }
+
+  if (showAuth) {
+    return <AuthPage />;
+  }
+
+  if (isGuest) {
+    const handleSelectAttorney = (attorneyId: string) => {
+      setShowAuth(true);
+    };
+
+    return (
+      <GuestLayout onShowAuth={() => setShowAuth(true)}>
+        <AttorneySearch onSelectAttorney={handleSelectAttorney} />
+      </GuestLayout>
+    );
+  }
+
+  const isAttorney = userProfile?.user_type === 'attorney';
+
+  useEffect(() => {
+    if (currentView === 'default' && userProfile) {
+      setCurrentView(userProfile.user_type === 'attorney' ? 'profile' : 'search');
+    }
+  }, [currentView, userProfile]);
+  
+
+  const handleSelectAttorney = (attorneyId: string) => {
+    setSelectedAttorneyId(attorneyId);
+    setCurrentView('booking');
+  };
+
+  const handleBackToSearch = () => {
+    setSelectedAttorneyId(null);
+    setCurrentView('search');
+  };
+
+  const renderContent = () => {
+    if (isAttorney) {
+      switch (currentView) {
+        case 'profile':
+          return <ProfileSetup />;
+        case 'services':
+          return <ServicesManager />;
+        case 'availability':
+          return <AvailabilityManager />;
+        case 'appointments':
+          return <AppointmentsDashboard />;
+        default:
+          return <ProfileSetup />;
+      }
+    } else {
+      switch (currentView) {
+        case 'search':
+          return <AttorneySearch onSelectAttorney={handleSelectAttorney} />;
+        case 'booking':
+          return selectedAttorneyId ? (
+            <BookingPage attorneyId={selectedAttorneyId} onBack={handleBackToSearch} />
+          ) : (
+            <AttorneySearch onSelectAttorney={handleSelectAttorney} />
+          );
+        case 'appointments':
+          return <ClientDashboard />;
+        default:
+          return <AttorneySearch onSelectAttorney={handleSelectAttorney} />;
+      }
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Layout currentView={currentView} onNavigate={setCurrentView}>
+      {renderContent()}
+    </Layout>
+  );
 }
 
-export default App
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
+export default App;
